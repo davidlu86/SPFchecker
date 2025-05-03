@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bulk SPF Checker</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>SPF Record Checker</h1>
+    
+    <!-- Input Section -->
+    <div class="input-section">
+        <textarea id="domainInput" rows="10" placeholder="Enter domains (one per line)"></textarea>
+        <button onclick="startCheck()">Check SPF Records</button>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+        <input type="text" id="domainFilter" placeholder="Search domains..." onkeyup="filterResults()">
+        <input type="text" id="spfFilter" placeholder="Filter SPF records..." onkeyup="filterResults()">
+    </div>
+
+    <!-- Results Table -->
+    <div id="loading" style="display: none;">Processing... (This may take a while)</div>
+    <table id="resultsTable">
+        <thead>
+            <tr>
+                <th>Domain</th>
+                <th>SPF Found</th>
+                <th>SPF Record</th>
+                <th>Error</th>
+            </tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+    </table>
+
+    <script>
+        async function startCheck() {
+            const domains = document.getElementById('domainInput').value.split('\n').filter(d => d.trim());
+            if (domains.length === 0) return alert('Please enter domains!');
+
+            const loading = document.getElementById('loading');
+            loading.style.display = 'block';
+            
+            try {
+                const response = await fetch('/check', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ domains })
+                });
+                
+                const results = await response.json();
+                renderResults(results);
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        function renderResults(results) {
+            const tbody = document.getElementById('resultsBody');
+            tbody.innerHTML = results.map(result => `
+                <tr>
+                    <td>${result.domain}</td>
+                    <td>${result.has_spf ? '✅' : '❌'}</td>
+                    <td>${result.spf_record || '-'}</td>
+                    <td class="error">${result.error || '-'}</td>
+                </tr>
+            `).join('');
+        }
+
+        function filterResults() {
+            const domainFilter = document.getElementById('domainFilter').value.toLowerCase();
+            const spfFilter = document.getElementById('spfFilter').value.toLowerCase();
+            
+            Array.from(document.querySelectorAll('#resultsBody tr')).forEach(row => {
+                const domain = row.cells[0].textContent.toLowerCase();
+                const spf = (row.cells[2].textContent || '').toLowerCase();
+                const showRow = domain.includes(domainFilter) && spf.includes(spfFilter);
+                row.style.display = showRow ? '' : 'none';
+            });
+        }
+    </script>
+</body>
+</html>
